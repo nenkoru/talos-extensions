@@ -1,0 +1,72 @@
+name: openziti
+variant: alpine
+shell: /toolchain/bin/bash
+install:
+  - unzip
+  - zip
+  - ninja-build
+  - ninja
+dependencies:
+  - image: "ghcr.io/siderolabs/tools:v1.8.0-alpha.0-8-ga764e8d"
+steps:
+  - cachePaths:
+    - /vcpkg
+  - sources:
+      - url: https://github.com/openziti/ziti-tunnel-sdk-c/archive/refs/tags/v1.1.0.tar.gz
+        destination: edge-tunnel-source.tar.gz
+        sha256: 0c46838c93c32472e4634dbc8c657b74c66576c68b036c90de0bff7662db0466
+        sha512: e8f6e483b52d2935519b115335c365e611afb33b141f3b98608df67f3ee5ea51dceebb92f45b0019225af90a16f65816646bf6e3ff5bc1d4326de4663b726a03
+
+    env:
+      VCPKG_ROOT: /vcpkg
+      VCPKG_FORCE_SYSTEM_BINARIES: 1
+      CC: /toolchain/bin/gcc
+      CXX: /toolchain/bin/g++
+    prepare:
+      - |
+        sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
+
+      - |
+        mkdir /vcpkg /ziti-tunnel-sdk-c-tar
+        tar -xzvf edge-tunnel-source.tar.gz --strip-components=1 -C /ziti-tunnel-sdk-c-tar
+
+      - |
+        git clone https://github.com/microsoft/vcpkg.git /vcpkg
+        git --git-dir=/vcpkg/.git --work-tree=/vcpkg checkout 2024.07.12
+
+      - |
+        git clone https://github.com/openziti/ziti-tunnel-sdk-c.git /ziti-tunnel-sdk-c
+        mkdir /ziti-tunnel-sdk-c/build
+        git --git-dir=/ziti-tunnel-sdk-c/.git --work-tree=/ziti-tunnel-sdk-c checkout v1.1.0
+    build:
+      - |
+        export PATH=${PATH}:/toolchain/bin
+        /vcpkg/bootstrap-vcpkg.sh
+
+      - |
+        export PATH=${PATH}:/toolchain/bin
+        ln -s /toolchain/bin/g++ /toolchain/bin/aarch64-linux-gnu-g++
+        ln -s /toolchain/bin/gcc /toolchain/bin/aarch64-linux-gnu-gcc
+        cmake -DDISABLE_LIBSYSTEMD_FEATURE=ON -DCMAKE_C_COMPILER=/toolchain/bin/gcc -DCMAKE_CXX_COMPILER=/toolchain/bin/g++ -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -DCMAKE_BUILD_TYPE=Release --preset ci-linux-x64 -S /ziti-tunnel-sdk-c -B /ziti-tunnel-sdk-c/build
+      - |
+        cmake --build /ziti-tunnel-sdk-c/build
+
+
+    install:
+      - |
+        mkdir -p /rootfs/usr/local/lib/containers/openziti/usr/local/bin/
+        cp -pr ziti-edge-tunnel /rootfs/usr/local/lib/containers/openziti/usr/local/bin
+    test:
+      - |
+        ./ziti-edge-tunnel
+        mkdir -p /extensions-validator-rootfs
+        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
+        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
+        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+finalize:
+  - from: /rootfs
+    to: /rootfs
+  - from: /pkg/manifest.yaml
+    to: /
+  - from: /pkg/openziti.yaml
+    to: /rootfs/usr/local/etc/containers/

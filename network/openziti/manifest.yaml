@@ -1,0 +1,11 @@
+version: v1alpha1
+metadata:
+  name: openziti
+  version: "$VERSION"
+  author: Ruslan Chernenko
+  description: |
+    OpenZiti is the world’s most used and widely integrated open source secure networking platform.
+    This extension deploys a ziti-edge-tunneler.
+  compatibility:
+    talos:
+      version: ">= v1.7.6"
