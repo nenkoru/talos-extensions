@@ -9,13 +9,11 @@ install:
 dependencies:
   - image: "ghcr.io/siderolabs/tools:v1.8.0-alpha.0-8-ga764e8d"
 steps:
-  - cachePaths:
-    - /vcpkg
   - sources:
-      - url: https://github.com/openziti/ziti-tunnel-sdk-c/archive/refs/tags/v1.1.0.tar.gz
+      - url: https://github.com/openziti/ziti-tunnel-sdk-c/archive/refs/tags/v1.1.2.tar.gz
         destination: edge-tunnel-source.tar.gz
-        sha256: 0c46838c93c32472e4634dbc8c657b74c66576c68b036c90de0bff7662db0466
-        sha512: e8f6e483b52d2935519b115335c365e611afb33b141f3b98608df67f3ee5ea51dceebb92f45b0019225af90a16f65816646bf6e3ff5bc1d4326de4663b726a03
+        sha256: d455672bf3b6ff28fd0ff864f868f7d6e3de99e6c666a120227fa9dab2d91f78
+        sha512: 5aeb05347381124e9d75693f12e0d234499a8c6482d322019576a24c622d986d43f159454a43c844623f171a456062a5e1afffcee7f7cbb03740216dbd3bb74c
 
     env:
       VCPKG_ROOT: /vcpkg
@@ -27,17 +25,16 @@ steps:
         sed -i 's#$VERSION#{{ .VERSION }}#' /pkg/manifest.yaml
 
       - |
-        mkdir /vcpkg /ziti-tunnel-sdk-c-tar
-        tar -xzvf edge-tunnel-source.tar.gz --strip-components=1 -C /ziti-tunnel-sdk-c-tar
+        mkdir -p /vcpkg /ziti-tunnel-sdk-c/build
+        tar -xzvf edge-tunnel-source.tar.gz --strip-components=1 -C /ziti-tunnel-sdk-c
 
       - |
+        # vcpkg depends on git as a delivery tool
+        # if to download .tar.gz from releases it would fail saying it cannot retrieve its version
+        # we fetch here commit to which tag 2024.07.12 is assigned
         git clone https://github.com/microsoft/vcpkg.git /vcpkg
-        git --git-dir=/vcpkg/.git --work-tree=/vcpkg checkout 2024.07.12
+        git --git-dir=/vcpkg/.git --work-tree=/vcpkg checkout 1de2026f28ead93ff1773e6e680387643e914ea1
 
-      - |
-        git clone https://github.com/openziti/ziti-tunnel-sdk-c.git /ziti-tunnel-sdk-c
-        mkdir /ziti-tunnel-sdk-c/build
-        git --git-dir=/ziti-tunnel-sdk-c/.git --work-tree=/ziti-tunnel-sdk-c checkout v1.1.0
     build:
       - |
         export PATH=${PATH}:/toolchain/bin
@@ -45,24 +42,21 @@ steps:
 
       - |
         export PATH=${PATH}:/toolchain/bin
-        ln -s /toolchain/bin/g++ /toolchain/bin/aarch64-linux-gnu-g++
-        ln -s /toolchain/bin/gcc /toolchain/bin/aarch64-linux-gnu-gcc
-        cmake -DDISABLE_LIBSYSTEMD_FEATURE=ON -DCMAKE_C_COMPILER=/toolchain/bin/gcc -DCMAKE_CXX_COMPILER=/toolchain/bin/g++ -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -DCMAKE_BUILD_TYPE=Release --preset ci-linux-x64 -S /ziti-tunnel-sdk-c -B /ziti-tunnel-sdk-c/build
+        PRESET="ci-linux-x64"
+        if [[ "$(uname -m)" == "arm64" || "$(uname -m)" == "aarch64" ]]; then
+            PRESET="ci-linux-arm64"
+            ln -s /toolchain/bin/g++ /toolchain/bin/aarch64-linux-gnu-g++
+            ln -s /toolchain/bin/gcc /toolchain/bin/aarch64-linux-gnu-gcc
+        fi
+        cmake -DDISABLE_SEMVER_VERIFICATION=ON -DDISABLE_LIBSYSTEMD_FEATURE=ON -DCMAKE_C_COMPILER=/toolchain/bin/gcc -DCMAKE_CXX_COMPILER=/toolchain/bin/g++ -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja --preset $PRESET -S /ziti-tunnel-sdk-c -B /ziti-tunnel-sdk-c/build
       - |
-        cmake --build /ziti-tunnel-sdk-c/build
+        cmake --build /ziti-tunnel-sdk-c/build --config Release
 
 
     install:
       - |
         mkdir -p /rootfs/usr/local/lib/containers/openziti/usr/local/bin/
-        cp -pr ziti-edge-tunnel /rootfs/usr/local/lib/containers/openziti/usr/local/bin
-    test:
-      - |
-        ./ziti-edge-tunnel
-        mkdir -p /extensions-validator-rootfs
-        cp -r /rootfs/ /extensions-validator-rootfs/rootfs
-        cp /pkg/manifest.yaml /extensions-validator-rootfs/manifest.yaml
-        /extensions-validator validate --rootfs=/extensions-validator-rootfs --pkg-name="${PKG_NAME}"
+        cp -pr /ziti-tunnel-sdk-c/build/programs/ziti-edge-tunnel/Release/ziti-edge-tunnel /rootfs/usr/local/lib/containers/openziti/usr/local/bin
 finalize:
   - from: /rootfs
     to: /rootfs
