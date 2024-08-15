@@ -7,7 +7,7 @@ install:
   - ninja-build
   - ninja
 dependencies:
-  - image: "ghcr.io/siderolabs/tools:v1.8.0-alpha.0-8-ga764e8d"
+  - image: "ghcr.io/siderolabs/tools:v1.7.0-4-gc844dc3"
 steps:
   - sources:
       - url: https://github.com/openziti/ziti-tunnel-sdk-c/archive/refs/tags/v1.1.2.tar.gz
@@ -51,12 +51,10 @@ steps:
         cmake -DDISABLE_SEMVER_VERIFICATION=ON -DDISABLE_LIBSYSTEMD_FEATURE=ON -DCMAKE_C_COMPILER=/toolchain/bin/gcc -DCMAKE_CXX_COMPILER=/toolchain/bin/g++ -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja --preset $PRESET -S /ziti-tunnel-sdk-c -B /ziti-tunnel-sdk-c/build
       - |
         cmake --build /ziti-tunnel-sdk-c/build --config Release
-
-
     install:
       - |
         mkdir -p /rootfs/usr/local/lib/containers/openziti/usr/local/bin/
-        cp -pr /ziti-tunnel-sdk-c/build/programs/ziti-edge-tunnel/Release/ziti-edge-tunnel /rootfs/usr/local/lib/containers/openziti/usr/local/bin
+        mv /ziti-tunnel-sdk-c/build/programs/ziti-edge-tunnel/Release/ziti-edge-tunnel /rootfs/usr/local/lib/containers/openziti/usr/local/bin/tunnel
 finalize:
   - from: /rootfs
     to: /rootfs

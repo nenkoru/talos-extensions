@@ -7,12 +7,11 @@ depends:
     - etcfiles
   - configuration: true
 container:
-  entrypoint: /usr/local/bin/containerboot
-  environment:
-  - PATH=/sbin:/usr/local/bin
-  - TS_SOCKET=/var/run/tailscale/tailscaled.sock
-  - TS_STATE_DIR=/var/lib/tailscale
-  - TS_USERSPACE=false
+  entrypoint: /usr/local/bin/tunnel
+  args:
+    - --verbose=2
+    - --dns-ip-range=100.64.0.1/10
+    - --identity-dir=/var/lib/openziti/etc/identities
   security:
     writeableRootfs: false
     writeableSysfs: true
@@ -53,8 +52,8 @@ container:
       - bind
       - rw
   ## Tailscale state. Particularly its 'auth' state
-  - source: /var/lib/tailscale
-    destination: /var/lib/tailscale
+  - source: /var/lib/openziti/etc/identities
+    destination: /var/lib/openziti/etc/identities
     type: bind
     options:
       - bind
