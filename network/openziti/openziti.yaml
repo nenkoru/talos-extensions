@@ -7,53 +7,42 @@ depends:
     - etcfiles
   - configuration: true
 container:
-  entrypoint: /usr/local/bin/tunnel
+  entrypoint: /usr/local/bin/ziti-edge-tunnel
   args:
-    - --verbose=2
-    - --dns-ip-range=100.64.0.1/10
-    - --identity-dir=/var/lib/openziti/etc/identities
+    - run-host
+    - --verbose=4
+    - --identity-dir=/var/lib/ziti/etc/identities
   security:
     writeableRootfs: false
     writeableSysfs: true
   mounts:
-  # libs
-  - source: /lib
-    destination: /lib
-    type: bind
-    options:
-      - bind
-      - ro
-  # more libs
+    # libssl lib
   - source: /usr/lib
     destination: /usr/lib
     type: bind
     options:
       - bind
       - ro
-  ## Required for tailscale. Ip addr and other commands
   - source: /sbin
     destination: /sbin
     type: bind
     options:
       - bind
       - ro
-  ## Tailscale needs to write to this to create the interfaces
   - source: /dev/net/tun
     destination: /dev/net/tun
     type: bind
     options:
       - bind
       - rw
-  ## Tailscale socket
-  - source: /var/run/tailscale
-    destination: /var/run/tailscale
+  - source: /var/lib/ziti/etc/identities/
+    destination: /var/lib/ziti/etc/identities/
     type: bind
     options:
       - bind
       - rw
-  ## Tailscale state. Particularly its 'auth' state
-  - source: /var/lib/openziti/etc/identities
-    destination: /var/lib/openziti/etc/identities
+  - source: /var/lib/ziti/
+    destination: /var/lib/ziti/
     type: bind
     options:
       - bind
